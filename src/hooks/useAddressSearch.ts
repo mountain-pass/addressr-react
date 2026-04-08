@@ -5,7 +5,8 @@ import type { SearchPage } from '../api';
 import type { AddressSearchResult, AddressDetail } from '../types';
 
 export interface UseAddressSearchOptions {
-  apiKey: string;
+  /** RapidAPI key. Omit when connecting directly to an addressr instance. */
+  apiKey?: string;
   apiUrl?: string;
   apiHost?: string;
   debounceMs?: number;

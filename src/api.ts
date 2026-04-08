@@ -5,7 +5,8 @@ import type { AddressSearchResult, AddressDetail } from './types';
 const SEARCH_REL = 'https://addressr.io/rels/address-search';
 
 export interface AddressrClientOptions {
-  apiKey: string;
+  /** RapidAPI key. Omit when connecting directly to an addressr instance. */
+  apiKey?: string;
   apiUrl?: string;
   apiHost?: string;
   /** @internal — for testing only */
@@ -33,10 +34,11 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     fetchImpl,
   } = options;
 
-  const headers: Record<string, string> = {
-    'x-rapidapi-key': apiKey,
-    'x-rapidapi-host': apiHost,
-  };
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers['x-rapidapi-key'] = apiKey;
+    headers['x-rapidapi-host'] = apiHost;
+  }
 
   const fetchLink = glowUpFetchWithLinks(
     ((url: RequestInfo | URL, init?: RequestInit) =>

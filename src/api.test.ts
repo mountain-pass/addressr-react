@@ -161,4 +161,27 @@ describe('createAddressrClient', () => {
 
     await expect(client.searchAddresses('test')).rejects.toThrow('403');
   });
+
+  it('works without apiKey (no RapidAPI headers)', async () => {
+    const noKeyFetch = vi.fn();
+    const noKeyClient = createAddressrClient({
+      apiUrl: 'https://api.addressr.io/',
+      fetchImpl: noKeyFetch,
+    });
+
+    noKeyFetch
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_RESPONSE);
+
+    const page = await noKeyClient.searchAddresses('1 george');
+    expect(page.results).toHaveLength(1);
+
+    // Should NOT include RapidAPI headers
+    for (const call of noKeyFetch.mock.calls) {
+      const init = call[1] as RequestInit;
+      const hdrs = init.headers as Record<string, string>;
+      expect(hdrs).not.toHaveProperty('x-rapidapi-key');
+      expect(hdrs).not.toHaveProperty('x-rapidapi-host');
+    }
+  });
 });

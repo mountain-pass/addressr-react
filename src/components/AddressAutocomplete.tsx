@@ -6,7 +6,8 @@ import type { AddressDetail, AddressSearchResult } from '../types';
 import styles from './AddressAutocomplete.module.css';
 
 export interface AddressAutocompleteProps {
-  apiKey: string;
+  /** RapidAPI key. Omit when connecting directly to an addressr instance. */
+  apiKey?: string;
   onSelect: (address: AddressDetail) => void;
   label?: string;
   placeholder?: string;
