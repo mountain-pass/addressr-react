@@ -20,7 +20,7 @@ const rootResponse = () =>
     'https://addressr.p.rapidapi.com/',
   );
 
-const searchResponse = () =>
+const searchResponse = (hasNext = false) =>
   mockResponse(
     [
       {
@@ -30,10 +30,25 @@ const searchResponse = () =>
         highlight: { sla: '<em>1</em> <em>GEORGE</em> ST, SYDNEY NSW 2000' },
       },
     ],
-    {},
+    hasNext
+      ? { link: '</addresses/GANSW123>; rel=canonical; anchor="#/0", </addresses?q=1+george&p=2>; rel=next' }
+      : { link: '</addresses/GANSW123>; rel=canonical; anchor="#/0"' },
     'https://addressr.p.rapidapi.com/addresses?q=1+george',
   );
 
+const page2Response = () =>
+  mockResponse(
+    [
+      {
+        sla: '2 GEORGE ST, SYDNEY NSW 2000',
+        pid: 'GANSW456',
+        score: 18,
+        highlight: { sla: '<em>2</em> <em>GEORGE</em> ST, SYDNEY NSW 2000' },
+      },
+    ],
+    { link: '</addresses/GANSW456>; rel=canonical; anchor="#/0"' },
+    'https://addressr.p.rapidapi.com/addresses?q=1+george&p=2',
+  );
 
 const detailResponse = () =>
   mockResponse(
@@ -78,7 +93,7 @@ describe('AddressAutocomplete', () => {
   it('displays results after typing', async () => {
     const mockFetch = vi.fn()
       .mockResolvedValueOnce(rootResponse())
-      .mockResolvedValueOnce(searchResponse());
+      .mockImplementation(() => Promise.resolve(searchResponse()));
 
     render(
       <AddressAutocomplete
@@ -99,7 +114,7 @@ describe('AddressAutocomplete', () => {
   it('renders highlights with mark elements', async () => {
     const mockFetch = vi.fn()
       .mockResolvedValueOnce(rootResponse())
-      .mockResolvedValueOnce(searchResponse());
+      .mockImplementation(() => Promise.resolve(searchResponse()));
 
     render(
       <AddressAutocomplete
@@ -122,10 +137,13 @@ describe('AddressAutocomplete', () => {
     const onSelect = vi.fn();
     const mockFetch = vi.fn()
       .mockResolvedValueOnce(rootResponse())
-      .mockResolvedValueOnce(searchResponse())
-      .mockResolvedValueOnce(detailResponse())
-      // After selection, downshift resets input which may trigger another search
-      .mockResolvedValue(searchResponse());
+      .mockImplementation((url: string | Request | URL) => {
+        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+        if (urlStr.includes('/addresses/')) {
+          return Promise.resolve(detailResponse());
+        }
+        return Promise.resolve(searchResponse());
+      });
 
     render(
       <AddressAutocomplete
@@ -153,5 +171,89 @@ describe('AddressAutocomplete', () => {
       <AddressAutocomplete apiKey="test" onSelect={() => {}} fetchImpl={mockFetch} />,
     );
     expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('loads more results when scrolled near bottom', async () => {
+    let fetchCount = 0;
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(rootResponse())
+      .mockImplementation(() => {
+        fetchCount++;
+        // The last call is fetchNextPage for page 2
+        // We detect it by checking if scroll has been triggered (fetchCount resets don't matter)
+        return Promise.resolve(searchResponse(true));
+      });
+
+    render(
+      <AddressAutocomplete
+        apiKey="test"
+        onSelect={() => {}}
+        debounceMs={10}
+        fetchImpl={mockFetch}
+      />,
+    );
+
+    await userEvent.type(screen.getByRole('combobox'), '1 george');
+    await waitFor(() => expect(screen.getByRole('option')).toBeInTheDocument());
+
+    // Now swap the mock to return page 2 for the next call
+    mockFetch.mockImplementation(() => Promise.resolve(page2Response()));
+
+    // Simulate scroll near bottom of the menu
+    const menu = screen.getByRole('listbox');
+    Object.defineProperties(menu, {
+      scrollTop: { value: 100, writable: true },
+      scrollHeight: { value: 150, writable: true },
+      clientHeight: { value: 100, writable: true },
+    });
+    menu.dispatchEvent(new Event('scroll', { bubbles: true }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('option')).toHaveLength(2);
+    });
+  });
+
+  it('shows loading indicator while fetching more results', async () => {
+    let resolvePage2: (value: Response) => void;
+    const page2Promise = new Promise<Response>((resolve) => { resolvePage2 = resolve; });
+
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(rootResponse())
+      .mockImplementation(() => Promise.resolve(searchResponse(true)));
+
+    render(
+      <AddressAutocomplete
+        apiKey="test"
+        onSelect={() => {}}
+        debounceMs={10}
+        fetchImpl={mockFetch}
+      />,
+    );
+
+    await userEvent.type(screen.getByRole('combobox'), '1 george');
+    await waitFor(() => expect(screen.getByRole('option')).toBeInTheDocument());
+
+    // Swap mock to return a delayed promise for the next page fetch
+    mockFetch.mockReturnValue(page2Promise);
+
+    // Trigger scroll
+    const menu = screen.getByRole('listbox');
+    Object.defineProperties(menu, {
+      scrollTop: { value: 100, writable: true },
+      scrollHeight: { value: 150, writable: true },
+      clientHeight: { value: 100, writable: true },
+    });
+    menu.dispatchEvent(new Event('scroll', { bubbles: true }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Loading more...')).toBeInTheDocument();
+    });
+
+    // Resolve the page 2 fetch
+    resolvePage2!(page2Response());
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading more...')).not.toBeInTheDocument();
+    });
   });
 });

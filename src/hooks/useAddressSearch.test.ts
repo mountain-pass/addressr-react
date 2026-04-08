@@ -11,10 +11,14 @@ const MOCK_ROOT_RESPONSE = {
   json: () => Promise.resolve({}),
 };
 
-const makeMockSearchResponse = () => ({
+const makeMockSearchResponse = (hasNext = true) => ({
   ok: true,
   url: 'https://addressr.p.rapidapi.com/addresses?q=1+george',
-  headers: new Headers({}),
+  headers: new Headers(hasNext ? {
+    link: '</addresses/GANSW123>; rel=canonical; anchor="#/0", </addresses?q=1+george&p=2>; rel=next',
+  } : {
+    link: '</addresses/GANSW123>; rel=canonical; anchor="#/0"',
+  }),
   json: () =>
     Promise.resolve([
       {
@@ -22,6 +26,23 @@ const makeMockSearchResponse = () => ({
         pid: 'GANSW123',
         score: 19,
         highlight: { sla: '<em>1</em> <em>GEORGE</em> ST' },
+      },
+    ]),
+});
+
+const makeMockPage2Response = () => ({
+  ok: true,
+  url: 'https://addressr.p.rapidapi.com/addresses?q=1+george&p=2',
+  headers: new Headers({
+    link: '</addresses/GANSW456>; rel=canonical; anchor="#/0"',
+  }),
+  json: () =>
+    Promise.resolve([
+      {
+        sla: '2 GEORGE ST, SYDNEY NSW 2000',
+        pid: 'GANSW456',
+        score: 18,
+        highlight: { sla: '<em>2</em> <em>GEORGE</em> ST' },
       },
     ]),
 });
@@ -120,5 +141,70 @@ describe('useAddressSearch', () => {
     expect(result.current.query).toBe('');
     expect(result.current.results).toEqual([]);
     expect(result.current.selectedAddress).toBeNull();
+  });
+
+  it('hasMore is true when next link exists', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(makeMockSearchResponse(true));
+
+    const { result } = renderSearchHook(mockFetch);
+
+    act(() => result.current.setQuery('1 george'));
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+
+    expect(result.current.hasMore).toBe(true);
+  });
+
+  it('hasMore is false on last page', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(makeMockSearchResponse(false));
+
+    const { result } = renderSearchHook(mockFetch);
+
+    act(() => result.current.setQuery('1 george'));
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  it('loadMore appends results from next page', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(makeMockSearchResponse(true))
+      .mockResolvedValueOnce(makeMockPage2Response());
+
+    const { result } = renderSearchHook(mockFetch);
+
+    act(() => result.current.setQuery('1 george'));
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+
+    await act(() => result.current.loadMore());
+
+    expect(result.current.results).toHaveLength(2);
+    expect(result.current.results[0].pid).toBe('GANSW123');
+    expect(result.current.results[1].pid).toBe('GANSW456');
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  it('new search replaces accumulated results', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(makeMockSearchResponse(true))
+      .mockResolvedValueOnce(makeMockPage2Response())
+      .mockResolvedValueOnce(makeMockSearchResponse(false));
+
+    const { result } = renderSearchHook(mockFetch);
+
+    act(() => result.current.setQuery('1 george'));
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+
+    await act(() => result.current.loadMore());
+    expect(result.current.results).toHaveLength(2);
+
+    act(() => result.current.setQuery('2 george'));
+    await waitFor(() => expect(result.current.results).toHaveLength(1));
+    expect(result.current.results[0].pid).toBe('GANSW123');
   });
 });

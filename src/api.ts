@@ -1,4 +1,5 @@
 import { glowUpFetchWithLinks } from '@windyroad/fetch-link';
+import type { Link } from '@windyroad/link-header';
 import type { AddressSearchResult, AddressDetail } from './types';
 
 const SEARCH_REL = 'https://addressr.io/rels/address-search';
@@ -11,9 +12,17 @@ export interface AddressrClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface SearchPage {
+  results: AddressSearchResult[];
+  nextLink: Link | null;
+  /** @internal — used for HATEOAS canonical link following */
+  _links: Link[];
+}
+
 export interface AddressrClient {
-  searchAddresses: (query: string, signal?: AbortSignal) => Promise<AddressSearchResult[]>;
-  getAddressDetail: (pid: string, signal?: AbortSignal) => Promise<AddressDetail>;
+  searchAddresses: (query: string, signal?: AbortSignal) => Promise<SearchPage>;
+  fetchNextPage: (nextLink: Link, signal?: AbortSignal) => Promise<SearchPage>;
+  getAddressDetail: (pid: string, signal?: AbortSignal, searchPage?: SearchPage, resultIndex?: number) => Promise<AddressDetail>;
 }
 
 export function createAddressrClient(options: AddressrClientOptions): AddressrClient {
@@ -56,10 +65,20 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     return rootPromise;
   }
 
+  function toSearchPage(response: Awaited<ReturnType<typeof fetchLink>>, results: AddressSearchResult[]): SearchPage {
+    const nextLinks = response.links('next');
+    const allLinks = response.links();
+    return {
+      results,
+      nextLink: nextLinks.length > 0 ? nextLinks[0] : null,
+      _links: allLinks,
+    };
+  }
+
   async function searchAddresses(
     query: string,
     signal?: AbortSignal,
-  ): Promise<AddressSearchResult[]> {
+  ): Promise<SearchPage> {
     const root = await getRoot();
     const searchLinks = root.links(SEARCH_REL, { q: query.trim() });
     if (!searchLinks.length) {
@@ -69,13 +88,44 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     if (!response.ok) {
       throw new Error(`Search error: ${response.status} ${response.statusText}`);
     }
-    return response.json() as Promise<AddressSearchResult[]>;
+    const results = await response.json() as AddressSearchResult[];
+    return toSearchPage(response, results);
+  }
+
+  async function fetchNextPage(
+    nextLink: Link,
+    signal?: AbortSignal,
+  ): Promise<SearchPage> {
+    const response = await fetchLink(nextLink, { signal });
+    if (!response.ok) {
+      throw new Error(`Search error: ${response.status} ${response.statusText}`);
+    }
+    const results = await response.json() as AddressSearchResult[];
+    return toSearchPage(response, results);
   }
 
   async function getAddressDetail(
     pid: string,
     signal?: AbortSignal,
+    searchPage?: SearchPage,
+    resultIndex?: number,
   ): Promise<AddressDetail> {
+    // Prefer HATEOAS: follow canonical link from search results
+    if (searchPage && resultIndex !== undefined) {
+      const anchor = `#/${resultIndex}`;
+      const canonicalLink = searchPage._links.find(
+        (link) => link.rel === 'canonical' && link.anchor === anchor,
+      );
+      if (canonicalLink) {
+        const response = await fetchLink(canonicalLink, { signal });
+        if (!response.ok) {
+          throw new Error(`Detail error: ${response.status} ${response.statusText}`);
+        }
+        return response.json() as Promise<AddressDetail>;
+      }
+    }
+
+    // Fallback: construct URL from PID
     const root = await getRoot();
     const baseUrl = new URL(root.url);
     const addressUrl = new URL(
@@ -89,5 +139,5 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     return response.json() as Promise<AddressDetail>;
   }
 
-  return { searchAddresses, getAddressDetail };
+  return { searchAddresses, fetchNextPage, getAddressDetail };
 }

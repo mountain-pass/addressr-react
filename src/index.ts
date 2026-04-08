@@ -3,7 +3,7 @@ export type { UseAddressSearchOptions, UseAddressSearchReturn } from './hooks/us
 export { AddressAutocomplete } from './components/AddressAutocomplete';
 export type { AddressAutocompleteProps } from './components/AddressAutocomplete';
 export { createAddressrClient } from './api';
-export type { AddressrClientOptions, AddressrClient } from './api';
+export type { AddressrClientOptions, AddressrClient, SearchPage } from './api';
 export { parseHighlight } from './utils/parseHighlight';
 export type {
   AddressSearchResult,

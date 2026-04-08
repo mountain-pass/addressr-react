@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import type { Link } from '@windyroad/link-header';
 import { createAddressrClient } from '../api';
+import type { SearchPage } from '../api';
 import type { AddressSearchResult, AddressDetail } from '../types';
 
 export interface UseAddressSearchOptions {
@@ -17,6 +19,9 @@ export interface UseAddressSearchReturn {
   setQuery: (q: string) => void;
   results: AddressSearchResult[];
   isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  loadMore: () => Promise<void>;
   error: Error | null;
   selectedAddress: AddressDetail | null;
   selectAddress: (pid: string) => Promise<void>;
@@ -37,11 +42,14 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState<AddressSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<AddressDetail | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const abortRef = useRef<AbortController>(undefined);
+  const nextLinkRef = useRef<Link | null>(null);
+  const searchPageRef = useRef<SearchPage | null>(null);
 
   const client = useMemo(
     () => createAddressrClient({ apiKey, apiUrl, apiHost, fetchImpl }),
@@ -63,6 +71,8 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
   useEffect(() => {
     if (debouncedQuery.length < minQueryLength) {
       setResults([]);
+      nextLinkRef.current = null;
+      searchPageRef.current = null;
       return;
     }
 
@@ -75,9 +85,11 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
 
     client
       .searchAddresses(debouncedQuery, controller.signal)
-      .then((data) => {
+      .then((page) => {
         if (!controller.signal.aborted) {
-          setResults(data);
+          setResults(page.results);
+          nextLinkRef.current = page.nextLink;
+          searchPageRef.current = page;
           setIsLoading(false);
         }
       })
@@ -86,18 +98,54 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
           setError(err);
           setIsLoading(false);
           setResults([]);
+          nextLinkRef.current = null;
+          searchPageRef.current = null;
         }
       });
 
     return () => controller.abort();
   }, [debouncedQuery, minQueryLength, client]);
 
+  const [hasMore, setHasMore] = useState(false);
+
+  // Keep hasMore in sync with nextLinkRef
+  useEffect(() => {
+    setHasMore(nextLinkRef.current !== null);
+  }, [results]);
+
+  const loadMore = useCallback(async () => {
+    const nextLink = nextLinkRef.current;
+    if (!nextLink || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const page = await client.fetchNextPage(nextLink);
+      setResults((prev) => [...prev, ...page.results]);
+      nextLinkRef.current = page.nextLink;
+      searchPageRef.current = page;
+      setHasMore(page.nextLink !== null);
+    } catch (err) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError(err);
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [client, isLoadingMore]);
+
   const selectAddress = useCallback(
     async (pid: string) => {
-      const detail = await client.getAddressDetail(pid);
+      // Find the result index for HATEOAS canonical link following
+      const index = results.findIndex((r) => r.pid === pid);
+      const detail = await client.getAddressDetail(
+        pid,
+        undefined,
+        index !== -1 ? searchPageRef.current ?? undefined : undefined,
+        index !== -1 ? index : undefined,
+      );
       setSelectedAddress(detail);
     },
-    [client],
+    [client, results],
   );
 
   const clear = useCallback(() => {
@@ -106,6 +154,9 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
     setResults([]);
     setSelectedAddress(null);
     setError(null);
+    nextLinkRef.current = null;
+    searchPageRef.current = null;
+    setHasMore(false);
   }, []);
 
   return {
@@ -113,6 +164,9 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
     setQuery,
     results,
     isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
     error,
     selectedAddress,
     selectAddress,

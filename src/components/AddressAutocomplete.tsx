@@ -1,4 +1,4 @@
-import { useId, useEffect, useRef } from 'react';
+import { useId, useEffect, useRef, useCallback } from 'react';
 import { useCombobox } from 'downshift';
 import { useAddressSearch } from '../hooks/useAddressSearch';
 import { parseHighlight } from '../utils/parseHighlight';
@@ -40,6 +40,9 @@ export function AddressAutocomplete({
     setQuery,
     results,
     isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
     error,
     selectedAddress,
     selectAddress,
@@ -71,6 +74,17 @@ export function AddressAutocomplete({
     itemToString: (item) => item?.sla ?? '',
   });
 
+  const handleMenuScroll = useCallback(
+    (event: React.UIEvent<HTMLUListElement>) => {
+      if (!hasMore || isLoadingMore) return;
+      const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+      if (scrollHeight - scrollTop - clientHeight < 50) {
+        loadMore();
+      }
+    },
+    [hasMore, isLoadingMore, loadMore],
+  );
+
   const showMenu = isOpen && (results.length > 0 || isLoading || (query.length >= 3 && !isLoading));
 
   return (
@@ -94,7 +108,7 @@ export function AddressAutocomplete({
       </div>
 
       <ul
-        {...getMenuProps()}
+        {...getMenuProps({ onScroll: handleMenuScroll })}
         className={`${styles.menu} ${!showMenu ? styles.menuHidden : ''}`}
       >
         {showMenu && (
@@ -125,6 +139,9 @@ export function AddressAutocomplete({
                 </li>
               );
             })}
+            {isLoadingMore && (
+              <li role="presentation" className={styles.loading}>Loading more...</li>
+            )}
           </>
         )}
       </ul>

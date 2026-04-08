@@ -14,11 +14,23 @@ const MOCK_SEARCH_RESPONSE = {
   ok: true,
   url: 'https://addressr.p.rapidapi.com/addresses?q=1+george',
   headers: new Headers({
-    link: '</addresses/GANSW123>; rel=canonical; anchor="#/0"',
+    link: '</addresses/GANSW123>; rel=canonical; anchor="#/0", </addresses?q=1+george&p=2>; rel=next',
   }),
   json: () =>
     Promise.resolve([
       { sla: '1 GEORGE ST, SYDNEY NSW 2000', pid: 'GANSW123', score: 19, highlight: { sla: '<em>1</em> <em>GEORGE</em> ST' } },
+    ]),
+};
+
+const MOCK_SEARCH_PAGE2_RESPONSE = {
+  ok: true,
+  url: 'https://addressr.p.rapidapi.com/addresses?q=1+george&p=2',
+  headers: new Headers({
+    link: '</addresses/GANSW456>; rel=canonical; anchor="#/0"',
+  }),
+  json: () =>
+    Promise.resolve([
+      { sla: '2 GEORGE ST, SYDNEY NSW 2000', pid: 'GANSW456', score: 18, highlight: { sla: '<em>2</em> <em>GEORGE</em> ST' } },
     ]),
 };
 
@@ -44,14 +56,47 @@ describe('createAddressrClient', () => {
     client = createAddressrClient({ apiKey: 'test-key', fetchImpl: mockFetch });
   });
 
-  it('discovers search link from API root', async () => {
+  it('discovers search link from API root and returns SearchPage', async () => {
     mockFetch
       .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
       .mockResolvedValueOnce(MOCK_SEARCH_RESPONSE);
 
-    const results = await client.searchAddresses('1 george');
-    expect(results).toHaveLength(1);
-    expect(results[0].sla).toBe('1 GEORGE ST, SYDNEY NSW 2000');
+    const page = await client.searchAddresses('1 george');
+    expect(page.results).toHaveLength(1);
+    expect(page.results[0].sla).toBe('1 GEORGE ST, SYDNEY NSW 2000');
+  });
+
+  it('returns nextLink when API provides next link relation', async () => {
+    mockFetch
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_RESPONSE);
+
+    const page = await client.searchAddresses('1 george');
+    expect(page.nextLink).not.toBeNull();
+  });
+
+  it('returns null nextLink on last page', async () => {
+    mockFetch
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_PAGE2_RESPONSE);
+
+    const page = await client.searchAddresses('1 george');
+    expect(page.nextLink).toBeNull();
+  });
+
+  it('fetches next page via fetchNextPage', async () => {
+    mockFetch
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_PAGE2_RESPONSE);
+
+    const page1 = await client.searchAddresses('1 george');
+    expect(page1.nextLink).not.toBeNull();
+
+    const page2 = await client.fetchNextPage(page1.nextLink!);
+    expect(page2.results).toHaveLength(1);
+    expect(page2.results[0].sla).toBe('2 GEORGE ST, SYDNEY NSW 2000');
+    expect(page2.nextLink).toBeNull();
   });
 
   it('sends RapidAPI auth headers', async () => {
@@ -84,7 +129,19 @@ describe('createAddressrClient', () => {
     expect(mockFetch).toHaveBeenCalledTimes(3); // 1 root + 2 searches
   });
 
-  it('fetches address detail', async () => {
+  it('follows canonical link for address detail', async () => {
+    mockFetch
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_RESPONSE)
+      .mockResolvedValueOnce(MOCK_DETAIL_RESPONSE);
+
+    const page = await client.searchAddresses('1 george');
+    const detail = await client.getAddressDetail(page.results[0].pid, undefined, page, 0);
+    expect(detail.pid).toBe('GANSW123');
+    expect(detail.structured.locality.name).toBe('SYDNEY');
+  });
+
+  it('falls back to constructed URL when no search context', async () => {
     mockFetch
       .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
       .mockResolvedValueOnce(MOCK_DETAIL_RESPONSE);
