@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { withRetry, type RetryOptions } from './retry';
+import { withRetry } from './retry';
 
 describe('withRetry', () => {
   beforeEach(() => {
