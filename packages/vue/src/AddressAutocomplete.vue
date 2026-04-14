@@ -179,7 +179,7 @@ const activeDescendant = computed(() =>
 <style scoped>
 .addressr-wrapper {
   position: relative;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--addressr-font-family, system-ui, -apple-system, sans-serif);
 }
 .addressr-label {
   display: block;
@@ -189,32 +189,33 @@ const activeDescendant = computed(() =>
 }
 .addressr-input {
   width: 100%;
-  padding: 0.625rem 0.75rem;
+  padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
   font-size: 1rem;
   line-height: 1.5;
-  border: 1px solid #767676;
-  border-radius: 0.25rem;
+  color: var(--addressr-text-color, inherit);
+  border: 1px solid var(--addressr-border-color, #767676);
+  border-radius: var(--addressr-border-radius, 0.25rem);
   box-sizing: border-box;
 }
 .addressr-input:focus-visible {
-  outline: 2px solid #005fcc;
+  outline: 2px solid var(--addressr-focus-color, #005fcc);
   outline-offset: 1px;
-  border-color: #005fcc;
+  border-color: var(--addressr-focus-color, #005fcc);
 }
 .addressr-menu {
   position: absolute;
-  z-index: 1000;
+  z-index: var(--addressr-z-index, 1000);
   width: 100%;
   max-height: 20rem;
   overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
-  background: #fff;
-  border: 1px solid #767676;
+  background: var(--addressr-bg, #fff);
+  border: 1px solid var(--addressr-border-color, #767676);
   border-top: none;
-  border-radius: 0 0 0.25rem 0.25rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 var(--addressr-border-radius, 0.25rem) var(--addressr-border-radius, 0.25rem);
+  box-shadow: var(--addressr-shadow, 0 4px 6px rgba(0, 0, 0, 0.1));
   box-sizing: border-box;
 }
 .addressr-menu-hidden {
@@ -222,7 +223,7 @@ const activeDescendant = computed(() =>
 }
 .addressr-item {
   min-height: 2.75rem;
-  padding: 0.625rem 0.75rem;
+  padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -230,27 +231,27 @@ const activeDescendant = computed(() =>
   line-height: 1.4;
 }
 .addressr-item-highlighted {
-  background-color: #e8f0fe;
+  background-color: var(--addressr-highlight-bg, #e8f0fe);
 }
 .addressr-item :deep(mark) {
   background-color: transparent;
-  font-weight: 700;
-  color: inherit;
+  font-weight: var(--addressr-mark-weight, 700);
+  color: var(--addressr-mark-color, inherit);
 }
 .addressr-no-results {
-  padding: 0.625rem 0.75rem;
-  color: #555;
+  padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
+  color: var(--addressr-muted-color, #555);
   font-style: italic;
   font-size: 0.875rem;
 }
 .addressr-loading {
-  padding: 0.625rem 0.75rem;
-  color: #555;
+  padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
+  color: var(--addressr-muted-color, #555);
   font-size: 0.875rem;
 }
 .addressr-error {
-  padding: 0.625rem 0.75rem;
-  color: #d32f2f;
+  padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
+  color: var(--addressr-error-color, #d32f2f);
   font-size: 0.875rem;
 }
 .addressr-sr-only {

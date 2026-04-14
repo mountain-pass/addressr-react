@@ -69,6 +69,72 @@ function wait(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+describe('AddressAutocomplete CSS tokens', () => {
+  // @decision 002-css-custom-properties — all design tokens use var(--addressr-*)
+  let css: string;
+
+  beforeAll(async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const vue = fs.readFileSync(
+      path.resolve(__dirname, './AddressAutocomplete.vue'),
+      'utf-8',
+    );
+    // Extract the <style> block content
+    const match = vue.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+    css = match ? match[1] : '';
+  });
+
+  it('uses CSS custom properties for all color values', () => {
+    const lines = css.split('\n');
+    const bareHexLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('/*') || trimmed.startsWith('*')) continue;
+      if (/#[0-9a-fA-F]{3,8}\b/.test(trimmed) && !trimmed.includes('var(')) {
+        bareHexLines.push(trimmed);
+      }
+    }
+    expect(bareHexLines).toEqual([]);
+  });
+
+  it('uses CSS custom properties for font-family', () => {
+    const lines = css.split('\n');
+    const bareFontLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('font-family:') && !trimmed.includes('var(')) {
+        bareFontLines.push(trimmed);
+      }
+    }
+    expect(bareFontLines).toEqual([]);
+  });
+
+  it('uses CSS custom properties for box-shadow', () => {
+    const lines = css.split('\n');
+    const bareShadowLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('box-shadow:') && !trimmed.includes('var(') && trimmed !== 'box-shadow: none;') {
+        bareShadowLines.push(trimmed);
+      }
+    }
+    expect(bareShadowLines).toEqual([]);
+  });
+
+  it('uses CSS custom properties for z-index', () => {
+    const lines = css.split('\n');
+    const bareZLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('z-index:') && !trimmed.includes('var(')) {
+        bareZLines.push(trimmed);
+      }
+    }
+    expect(bareZLines).toEqual([]);
+  });
+});
+
 describe('useAddressSearch', () => {
   function createTestComposable(mockFetch: ReturnType<typeof vi.fn>) {
     return useAddressSearch({

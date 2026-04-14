@@ -35,6 +35,45 @@
 | Menu max-height | `20rem` | Dropdown scroll area |
 | Menu z-index | `1000` | Dropdown stacking |
 
+## CSS Custom Properties (Theming)
+
+All visual tokens are exposed as CSS custom properties with the `--addressr-` prefix. Consumers override them on any ancestor element. Defaults match the hardcoded values below — no visual change when no properties are set.
+
+### Usage
+
+```css
+/* Override on a wrapper element */
+.my-form {
+  --addressr-border-color: #000;
+  --addressr-focus-color: #0066cc;
+  --addressr-highlight-bg: #fff3cd;
+}
+```
+
+### Token Reference
+
+| Property | Default | Usage |
+|----------|---------|-------|
+| `--addressr-font-family` | `system-ui, -apple-system, sans-serif` | All text |
+| `--addressr-border-color` | `#767676` | Input/menu borders |
+| `--addressr-border-radius` | `0.25rem` | Corners |
+| `--addressr-focus-color` | `#005fcc` | Focus ring |
+| `--addressr-highlight-bg` | `#e8f0fe` | Hovered option bg |
+| `--addressr-bg` | `#fff` | Menu bg |
+| `--addressr-text-color` | `inherit` | Primary text |
+| `--addressr-muted-color` | `#555` | Loading/no-results |
+| `--addressr-error-color` | `#d32f2f` | Error text |
+| `--addressr-mark-color` | `inherit` | Highlight mark text |
+| `--addressr-mark-weight` | `700` | Highlight mark weight |
+| `--addressr-padding-x` | `0.75rem` | Horizontal padding |
+| `--addressr-padding-y` | `0.625rem` | Vertical padding |
+| `--addressr-shadow` | `0 4px 6px rgba(0,0,0,0.1)` | Menu shadow |
+| `--addressr-z-index` | `1000` | Menu stacking |
+
+### Contrast Requirements
+
+When overriding `--addressr-highlight-bg`, ensure the mark text color (`--addressr-mark-color`) maintains at least 4.5:1 contrast ratio against the new background. When overriding `--addressr-bg`, ensure all text colors maintain WCAG AA contrast.
+
 ## Component Patterns
 
 - Scoped styles per framework (CSS Modules for React, `<style>` for Svelte, `<style scoped>` for Vue)
