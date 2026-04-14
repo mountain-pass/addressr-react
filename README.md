@@ -1,128 +1,104 @@
-# @mountainpass/addressr-react
+# Addressr UI
 
-React address autocomplete component for Australian address search powered by [Addressr](https://addressr.io).
+Address autocomplete components for Australian address search, powered by the [Addressr](https://addressr.io) API and the [Geocoded National Address File (G-NAF)](https://data.gov.au/dataset/ds-dga-19432f89-dc3a-4ef3-b943-5326ef1dbecc).
 
-Search, validate, and retrieve detailed Australian address data from the Geocoded National Address File (G-NAF).
+Pick your framework:
 
-## Quick Start
+| Package | Install | Docs |
+|---------|---------|------|
+| **React** | `npm i @mountainpass/addressr-react` | [packages/react](./packages/react) |
+| **Svelte** | `npm i @mountainpass/addressr-svelte` | [packages/svelte](./packages/svelte) |
+| **Vue** | `npm i @mountainpass/addressr-vue` | [packages/vue](./packages/vue) |
+| **Core** (any framework) | `npm i @mountainpass/addressr-core` | [packages/core](./packages/core) |
 
-### 1. Get an API Key
+## Quick start
 
-Sign up at [RapidAPI](https://rapidapi.com/addressr-addressr-default/api/addressr) to get your API key.
-
-### 2. Install
-
-```bash
-npm install @mountainpass/addressr-react
-```
-
-### 3. Use the Component
+### React
 
 ```tsx
 import { AddressAutocomplete } from '@mountainpass/addressr-react';
 import '@mountainpass/addressr-react/style.css';
 
-function MyForm() {
-  return (
-    <AddressAutocomplete
-      apiKey="your-rapidapi-key"
-      onSelect={(address) => {
-        console.log(address.sla);           // "1 GEORGE ST, SYDNEY NSW 2000"
-        console.log(address.structured);    // { street, locality, state, postcode, ... }
-        console.log(address.geocoding);     // { latitude, longitude, ... }
-      }}
-    />
-  );
-}
+<AddressAutocomplete
+  apiUrl="https://api.addressr.io/"
+  onSelect={(address) => console.log(address)}
+/>
 ```
 
-### Or Use the Headless Hook
+### Svelte
 
-```tsx
-import { useAddressSearch } from '@mountainpass/addressr-react';
+```svelte
+<script>
+  import { AddressAutocomplete } from '@mountainpass/addressr-svelte';
+  import '@mountainpass/addressr-svelte/style.css';
+</script>
 
-function MyCustomAutocomplete() {
-  const {
-    query,
-    setQuery,
-    results,
-    isLoading,
-    selectedAddress,
-    selectAddress,
-    clear,
-  } = useAddressSearch({ apiKey: 'your-rapidapi-key' });
-
-  return (
-    <div>
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search addresses..."
-      />
-      {isLoading && <p>Searching...</p>}
-      <ul>
-        {results.map((result) => (
-          <li key={result.pid} onClick={() => selectAddress(result.pid)}>
-            {result.sla}
-          </li>
-        ))}
-      </ul>
-      {selectedAddress && (
-        <pre>{JSON.stringify(selectedAddress, null, 2)}</pre>
-      )}
-    </div>
-  );
-}
+<AddressAutocomplete
+  apiUrl="https://api.addressr.io/"
+  onSelect={(address) => console.log(address)}
+/>
 ```
 
-## API
+### Vue
 
-### `<AddressAutocomplete />`
+```vue
+<script setup>
+import { AddressAutocomplete } from '@mountainpass/addressr-vue';
+import '@mountainpass/addressr-vue/style.css';
+</script>
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `apiKey` | `string` | required | RapidAPI key |
-| `onSelect` | `(address: AddressDetail) => void` | required | Called when an address is selected |
-| `label` | `string` | `"Search Australian addresses"` | Accessible label |
-| `placeholder` | `string` | `"Start typing an address..."` | Input placeholder |
-| `className` | `string` | — | Additional CSS class for the wrapper |
-| `debounceMs` | `number` | `300` | Debounce delay in milliseconds |
-| `apiUrl` | `string` | `"https://addressr.p.rapidapi.com/"` | API root URL |
+<template>
+  <AddressAutocomplete
+    api-url="https://api.addressr.io/"
+    @select="(address) => console.log(address)"
+  />
+</template>
+```
 
-### `useAddressSearch(options)`
+### Custom UI (any framework)
 
-Returns `{ query, setQuery, results, isLoading, error, selectedAddress, selectAddress, clear }`.
+```ts
+import { createAddressrClient } from '@mountainpass/addressr-core';
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `apiKey` | `string` | required | RapidAPI key |
-| `apiUrl` | `string` | `"https://addressr.p.rapidapi.com/"` | API root URL |
-| `debounceMs` | `number` | `300` | Debounce delay |
-| `minQueryLength` | `number` | `3` | Minimum characters before searching |
+const client = createAddressrClient({ apiUrl: 'https://api.addressr.io/' });
+const page = await client.searchAddresses('1 george st');
 
-### `createAddressrClient(options)`
+console.log(page.results);  // AddressSearchResult[]
+console.log(page.nextLink); // Link | null — follow for next page
+```
 
-Low-level API client for direct use. Returns `{ searchAddresses, getAddressDetail }`.
+## Features
 
-## Architecture
+- **HATEOAS-native** -- discovers API endpoints via RFC 8288 Link headers, no hardcoded paths
+- **Accessible by default** -- WCAG AA, WAI-ARIA combobox pattern, keyboard navigation, screen reader announcements
+- **Infinite scroll pagination** -- loads more results as the user scrolls
+- **Safe highlight rendering** -- search match highlighting via `<mark>` elements, never innerHTML
+- **Headless or styled** -- use the drop-in component, or build your own UI with the headless hook/store/composable
+- **Framework-agnostic core** -- `@mountainpass/addressr-core` works anywhere, framework packages are thin wrappers
+- **Optional API key** -- connect directly to an Addressr instance or use RapidAPI
 
-- **HATEOAS** — the component discovers API endpoints via RFC 8288 Link headers, not hardcoded paths
-- **downshift** — WAI-ARIA APG combobox pattern with full keyboard navigation and screen reader support
-- **CSS Modules** — scoped styles, override via `className` prop
-- **Safe highlights** — search match highlighting rendered via `<mark>` elements, never `dangerouslySetInnerHTML`
+## Monorepo structure
 
-## Accessibility
+```
+packages/
+  core/     @mountainpass/addressr-core     API client, types, parseHighlight
+  react/    @mountainpass/addressr-react    useAddressSearch hook + AddressAutocomplete
+  svelte/   @mountainpass/addressr-svelte   createAddressSearch store + AddressAutocomplete
+  vue/      @mountainpass/addressr-vue      useAddressSearch composable + AddressAutocomplete
+```
 
-- WCAG AA compliant
-- Full keyboard navigation (arrow keys, Enter, Escape)
-- Screen reader announcements for results count and loading state
-- Visible focus indicators (3:1 contrast ratio)
-- Touch targets >= 44px
-- Accessible label always present
+## Data source
 
-## Data Source
+Address data from the [Geocoded National Address File (G-NAF)](https://data.gov.au/dataset/ds-dga-19432f89-dc3a-4ef3-b943-5326ef1dbecc), Australia's authoritative address database containing 15+ million addresses.
 
-Address data from the [Geocoded National Address File (G-NAF)](https://data.gov.au/dataset/ds-dga-19432f89-dc3a-4ef3-b943-5326ef1dbecc), Australia's authoritative address database.
+## Development
+
+```bash
+pnpm install
+pnpm turbo build    # Build all packages
+pnpm turbo test     # Run all 59 tests
+pnpm turbo lint     # Lint all packages
+```
 
 ## License
 
