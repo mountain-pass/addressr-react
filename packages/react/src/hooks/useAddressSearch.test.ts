@@ -87,15 +87,25 @@ describe('useAddressSearch', () => {
     expect(result.current.selectedAddress).toBeNull();
   });
 
+  it('prefetches API root on mount', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce(MOCK_ROOT_RESPONSE);
+    renderSearchHook(mockFetch);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('does not search when query is too short', async () => {
-    const mockFetch = vi.fn();
+    const mockFetch = vi.fn().mockResolvedValueOnce(MOCK_ROOT_RESPONSE);
     const { result } = renderSearchHook(mockFetch);
 
     act(() => result.current.setQuery('ab'));
 
     // Wait for debounce
     await new Promise((r) => setTimeout(r, 50));
-    expect(mockFetch).not.toHaveBeenCalled();
+    // Only the prefetch call should have happened, no search call
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.current.results).toEqual([]);
   });
 

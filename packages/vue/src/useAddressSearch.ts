@@ -44,6 +44,9 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
 
   const client = createAddressrClient({ apiKey, apiUrl, apiHost, fetchImpl });
 
+  // Prefetch API root so the first search doesn't pay discovery latency
+  client.prefetch();
+
   const query = ref('');
   const debouncedQuery = ref('');
   const results = ref<AddressSearchResult[]>([]);

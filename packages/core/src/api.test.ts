@@ -162,6 +162,34 @@ describe('createAddressrClient', () => {
     await expect(client.searchAddresses('test')).rejects.toThrow('403');
   });
 
+  it('prefetch eagerly fetches the API root', async () => {
+    mockFetch.mockResolvedValueOnce(MOCK_ROOT_RESPONSE);
+
+    await client.prefetch();
+
+    // Should have fetched the root
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefetch warms cache so searchAddresses skips root discovery', async () => {
+    mockFetch
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(MOCK_SEARCH_RESPONSE);
+
+    await client.prefetch();
+    await client.searchAddresses('1 george');
+
+    // 1 root (from prefetch) + 1 search = 2 total, NOT 3
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('prefetch swallows errors so it does not break the app', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+    // Should not throw
+    await expect(client.prefetch()).resolves.toBeUndefined();
+  });
+
   it('works without apiKey (no RapidAPI headers)', async () => {
     const noKeyFetch = vi.fn();
     const noKeyClient = createAddressrClient({

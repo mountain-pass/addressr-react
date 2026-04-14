@@ -48,6 +48,9 @@ export function createAddressSearch(options: AddressSearchOptions): AddressSearc
 
   const client = createAddressrClient({ apiKey, apiUrl, apiHost, fetchImpl });
 
+  // Prefetch API root so the first search doesn't pay discovery latency
+  client.prefetch();
+
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let abortController: AbortController | undefined;
   let nextLink: Link | null = null;

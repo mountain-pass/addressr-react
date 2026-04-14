@@ -91,13 +91,23 @@ describe('useAddressSearch', () => {
     expect(search.selectedAddress.value).toBeNull();
   });
 
+  it('prefetches API root on creation', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce(MOCK_ROOT_RESPONSE);
+    createTestComposable(mockFetch);
+
+    await vi.waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('does not search when query is too short', async () => {
-    const mockFetch = vi.fn();
+    const mockFetch = vi.fn().mockResolvedValueOnce(MOCK_ROOT_RESPONSE);
     const search = createTestComposable(mockFetch);
     search.setQuery('ab');
     await wait(50);
     await nextTick();
-    expect(mockFetch).not.toHaveBeenCalled();
+    // Only the prefetch call should have happened, no search call
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(search.results.value).toEqual([]);
   });
 

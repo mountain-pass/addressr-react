@@ -24,6 +24,8 @@ export interface AddressrClient {
   searchAddresses: (query: string, signal?: AbortSignal) => Promise<SearchPage>;
   fetchNextPage: (nextLink: Link, signal?: AbortSignal) => Promise<SearchPage>;
   getAddressDetail: (pid: string, signal?: AbortSignal, searchPage?: SearchPage, resultIndex?: number) => Promise<AddressDetail>;
+  /** Pre-fetch the API root so the first search doesn't pay the discovery latency. Errors are swallowed. */
+  prefetch: () => Promise<void>;
 }
 
 export function createAddressrClient(options: AddressrClientOptions): AddressrClient {
@@ -141,5 +143,13 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     return response.json() as Promise<AddressDetail>;
   }
 
-  return { searchAddresses, fetchNextPage, getAddressDetail };
+  async function prefetch(): Promise<void> {
+    try {
+      await getRoot();
+    } catch {
+      // Swallow errors — prefetch is optimistic
+    }
+  }
+
+  return { searchAddresses, fetchNextPage, getAddressDetail, prefetch };
 }

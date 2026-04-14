@@ -67,6 +67,11 @@ export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSe
     [debounceMs],
   );
 
+  // Prefetch API root on mount so the first search doesn't pay discovery latency
+  useEffect(() => {
+    client.prefetch();
+  }, [client]);
+
   // Search when debounced query changes
   useEffect(() => {
     if (debouncedQuery.length < minQueryLength) {
