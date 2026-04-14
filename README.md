@@ -74,6 +74,11 @@ console.log(page.nextLink); // Link | null — follow for next page
 - **Infinite scroll pagination** -- loads more results as the user scrolls
 - **Safe highlight rendering** -- search match highlighting via `<mark>` elements, never innerHTML
 - **Headless or styled** -- use the drop-in component, or build your own UI with the headless hook/store/composable
+- **Themeable** -- 17 CSS custom properties (`--addressr-*`) to match your design system
+- **Customizable rendering** -- render props (React) or slots (Svelte/Vue) to override loading, empty, error, and item rendering
+- **Skeleton loading** -- animated shimmer loading state, respects `prefers-reduced-motion`
+- **Automatic retry** -- exponential backoff with jitter on network errors and 5xx responses
+- **Form-ready** -- `name` and `required` props for native form integration
 - **Framework-agnostic core** -- `@mountainpass/addressr-core` works anywhere, framework packages are thin wrappers
 - **Optional API key** -- connect directly to an Addressr instance or use RapidAPI
 
@@ -96,7 +101,7 @@ Address data from the [Geocoded National Address File (G-NAF)](https://data.gov.
 ```bash
 pnpm install
 pnpm turbo build    # Build all packages
-pnpm turbo test     # Run all 59 tests
+pnpm turbo test     # Run all tests
 pnpm turbo lint     # Lint all packages
 ```
 

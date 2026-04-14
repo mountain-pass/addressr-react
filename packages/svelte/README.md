@@ -39,8 +39,28 @@ Peer dependencies: `svelte` >= 4.
 | `label` | `string` | `"Search Australian addresses"` | Accessible label text |
 | `placeholder` | `string` | `"Start typing an address..."` | Input placeholder |
 | `debounceMs` | `number` | `300` | Debounce delay in milliseconds |
+| `name` | `string` | `"address"` | Input name attribute for form submission |
+| `required` | `boolean` | `false` | Sets `aria-required` on the input |
 | `apiUrl` | `string` | `"https://addressr.p.rapidapi.com/"` | API root URL |
 | `apiHost` | `string` | `"addressr.p.rapidapi.com"` | RapidAPI host header |
+
+### Slots
+
+Override rendering zones while keeping built-in search logic and keyboard navigation:
+
+| Slot | Default | Description |
+|------|---------|-------------|
+| `loading` | Animated skeleton lines | Custom loading state |
+| `no-results` | "No addresses found" message | Custom empty state |
+
+```svelte
+<AddressAutocomplete apiUrl="https://api.addressr.io/" onSelect={handleSelect}>
+  <li slot="loading">Loading addresses...</li>
+  <li slot="no-results">No matches found</li>
+</AddressAutocomplete>
+```
+
+When you provide a custom slot, you are responsible for accessibility in that zone.
 
 ## Headless store
 
@@ -94,6 +114,42 @@ Build your own UI while keeping the search logic, debounce, pagination, and abor
 | `selectAddress(pid)` | Fetch full address detail |
 | `clear()` | Reset all state |
 | `destroy()` | Clean up timers and abort controllers |
+
+## Theming
+
+All visual styles use CSS custom properties. Override on any ancestor element:
+
+```css
+.my-form {
+  --addressr-font-family: 'Inter', sans-serif;
+  --addressr-border-color: #ccc;
+  --addressr-focus-color: #0066cc;
+  --addressr-highlight-bg: #e0f0ff;
+  --addressr-error-color: #c62828;
+}
+```
+
+| Token | Default | Description |
+|-------|---------|-------------|
+| `--addressr-font-family` | `system-ui, -apple-system, sans-serif` | Font stack |
+| `--addressr-padding-x` | `0.75rem` | Horizontal padding |
+| `--addressr-padding-y` | `0.625rem` | Vertical padding |
+| `--addressr-text-color` | `inherit` | Text color |
+| `--addressr-border-color` | `#767676` | Input and dropdown border |
+| `--addressr-border-radius` | `0.25rem` | Corner radius |
+| `--addressr-focus-color` | `#005fcc` | Focus ring and border |
+| `--addressr-z-index` | `1000` | Dropdown stacking order |
+| `--addressr-bg` | `#fff` | Dropdown background |
+| `--addressr-shadow` | `0 4px 6px rgba(0,0,0,0.1)` | Dropdown shadow |
+| `--addressr-highlight-bg` | `#e8f0fe` | Active item background |
+| `--addressr-mark-weight` | `700` | Search match font weight |
+| `--addressr-mark-color` | `inherit` | Search match text color |
+| `--addressr-muted-color` | `#555` | Status and empty text |
+| `--addressr-error-color` | `#d32f2f` | Error message text |
+| `--addressr-skeleton-from` | `#e0e0e0` | Loading skeleton base |
+| `--addressr-skeleton-to` | `#f0f0f0` | Loading skeleton shimmer |
+
+The loading state shows animated skeleton lines instead of text. The animation respects `prefers-reduced-motion: reduce`.
 
 ## Accessibility
 

@@ -52,6 +52,7 @@ const segments = parseHighlight('<em>1</em> <em>GEORGE</em> ST');
 | `apiKey` | `string` | -- | RapidAPI key. Omit for direct API access. |
 | `apiUrl` | `string` | `"https://addressr.p.rapidapi.com/"` | API root URL |
 | `apiHost` | `string` | `"addressr.p.rapidapi.com"` | RapidAPI host header |
+| `retry` | `RetryOptions \| false` | `{ maxRetries: 2, baseDelayMs: 500, maxDelayMs: 5000 }` | Retry config, or `false` to disable |
 | `fetchImpl` | `typeof fetch` | `globalThis.fetch` | Custom fetch (for testing) |
 
 Returns an `AddressrClient` with:
@@ -70,6 +71,18 @@ Returns an `AddressrClient` with:
   nextLink: Link | null;           // HATEOAS link to next page, or null
 }
 ```
+
+### `RetryOptions`
+
+```ts
+{
+  maxRetries?: number;   // Default: 2
+  baseDelayMs?: number;  // Default: 500 — exponential backoff base
+  maxDelayMs?: number;   // Default: 5000 — backoff cap
+}
+```
+
+Failed requests are retried with exponential backoff and jitter. Only network errors and 5xx responses are retried -- 4xx errors fail immediately. Pass `retry: false` to disable.
 
 ### `parseHighlight(html)`
 

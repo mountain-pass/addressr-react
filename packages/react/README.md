@@ -42,8 +42,33 @@ function MyForm() {
 | `placeholder` | `string` | `"Start typing an address..."` | Input placeholder |
 | `className` | `string` | -- | Additional CSS class for the wrapper |
 | `debounceMs` | `number` | `300` | Debounce delay in milliseconds |
+| `name` | `string` | `"address"` | Input name attribute for form submission |
+| `required` | `boolean` | -- | Sets `aria-required` on the input |
 | `apiUrl` | `string` | `"https://addressr.p.rapidapi.com/"` | API root URL |
 | `apiHost` | `string` | `"addressr.p.rapidapi.com"` | RapidAPI host header |
+| `renderLoading` | `() => ReactNode` | -- | Custom loading state renderer |
+| `renderNoResults` | `() => ReactNode` | -- | Custom no-results renderer |
+| `renderError` | `(error: Error) => ReactNode` | -- | Custom error renderer |
+| `renderItem` | `(item, highlighted, segments) => ReactNode` | -- | Custom result item renderer |
+
+### Render customization
+
+Override any rendering zone while keeping built-in search logic and keyboard navigation:
+
+```tsx
+<AddressAutocomplete
+  apiUrl="https://api.addressr.io/"
+  onSelect={handleSelect}
+  renderLoading={() => <li>Loading addresses...</li>}
+  renderNoResults={() => <li>No matches found</li>}
+  renderError={(err) => <div role="alert">Error: {err.message}</div>}
+  renderItem={(item, highlighted, segments) => (
+    <span>{segments.map((s, i) => s.highlighted ? <mark key={i}>{s.text}</mark> : s.text)}</span>
+  )}
+/>
+```
+
+When you provide a custom renderer, you are responsible for accessibility in that zone -- use appropriate roles and contrast ratios.
 
 ## Headless hook
 
@@ -90,6 +115,42 @@ function MyCustomAutocomplete() {
 | `selectedAddress` | `AddressDetail \| null` | Selected address detail |
 | `selectAddress` | `(pid: string) => Promise<void>` | Fetch full address detail |
 | `clear` | `() => void` | Reset all state |
+
+## Theming
+
+All visual styles use CSS custom properties. Override on any ancestor element:
+
+```css
+.my-form {
+  --addressr-font-family: 'Inter', sans-serif;
+  --addressr-border-color: #ccc;
+  --addressr-focus-color: #0066cc;
+  --addressr-highlight-bg: #e0f0ff;
+  --addressr-error-color: #c62828;
+}
+```
+
+| Token | Default | Description |
+|-------|---------|-------------|
+| `--addressr-font-family` | `system-ui, -apple-system, sans-serif` | Font stack |
+| `--addressr-padding-x` | `0.75rem` | Horizontal padding |
+| `--addressr-padding-y` | `0.625rem` | Vertical padding |
+| `--addressr-text-color` | `inherit` | Text color |
+| `--addressr-border-color` | `#767676` | Input and dropdown border |
+| `--addressr-border-radius` | `0.25rem` | Corner radius |
+| `--addressr-focus-color` | `#005fcc` | Focus ring and border |
+| `--addressr-z-index` | `1000` | Dropdown stacking order |
+| `--addressr-bg` | `#fff` | Dropdown background |
+| `--addressr-shadow` | `0 4px 6px rgba(0,0,0,0.1)` | Dropdown shadow |
+| `--addressr-highlight-bg` | `#e8f0fe` | Active item background |
+| `--addressr-mark-weight` | `700` | Search match font weight |
+| `--addressr-mark-color` | `inherit` | Search match text color |
+| `--addressr-muted-color` | `#555` | Status and empty text |
+| `--addressr-error-color` | `#d32f2f` | Error message text |
+| `--addressr-skeleton-from` | `#e0e0e0` | Loading skeleton base |
+| `--addressr-skeleton-to` | `#f0f0f0` | Loading skeleton shimmer |
+
+The loading state shows animated skeleton lines instead of text. The animation respects `prefers-reduced-motion: reduce`.
 
 ## Accessibility
 
