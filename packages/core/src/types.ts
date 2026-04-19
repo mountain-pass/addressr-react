@@ -47,3 +47,22 @@ export interface HighlightSegment {
   text: string;
   highlighted: boolean;
 }
+
+export interface PostcodeSearchResult {
+  postcode: string;
+  localities: Array<{ name: string }>;
+}
+
+export interface LocalitySearchResult {
+  name: string;
+  state: { name: string; abbreviation: string };
+  class?: { code: string; name: string };
+  postcode: string;
+  score: number;
+  pid: string;
+}
+
+export interface StateSearchResult {
+  name: string;
+  abbreviation: string;
+}

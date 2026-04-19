@@ -1,9 +1,18 @@
 import { glowUpFetchWithLinks } from '@windyroad/fetch-link';
 import type { Link } from '@windyroad/link-header';
-import type { AddressSearchResult, AddressDetail } from './types';
+import type {
+  AddressSearchResult,
+  AddressDetail,
+  PostcodeSearchResult,
+  LocalitySearchResult,
+  StateSearchResult,
+} from './types';
 import { withRetry, type RetryOptions } from './utils/retry';
 
 const SEARCH_REL = 'https://addressr.io/rels/address-search';
+const POSTCODE_SEARCH_REL = 'https://addressr.io/rels/postcode-search';
+const LOCALITY_SEARCH_REL = 'https://addressr.io/rels/locality-search';
+const STATE_SEARCH_REL = 'https://addressr.io/rels/state-search';
 
 export interface AddressrClientOptions {
   /** RapidAPI key. Omit when connecting directly to an addressr instance. */
@@ -16,17 +25,20 @@ export interface AddressrClientOptions {
   retry?: RetryOptions | false;
 }
 
-export interface SearchPage {
-  results: AddressSearchResult[];
+export interface SearchPage<T = AddressSearchResult> {
+  results: T[];
   nextLink: Link | null;
   /** @internal — used for HATEOAS canonical link following */
   _links: Link[];
 }
 
 export interface AddressrClient {
-  searchAddresses: (query: string, signal?: AbortSignal) => Promise<SearchPage>;
-  fetchNextPage: (nextLink: Link, signal?: AbortSignal) => Promise<SearchPage>;
-  getAddressDetail: (pid: string, signal?: AbortSignal, searchPage?: SearchPage, resultIndex?: number) => Promise<AddressDetail>;
+  searchAddresses: (query: string, signal?: AbortSignal) => Promise<SearchPage<AddressSearchResult>>;
+  searchPostcodes: (query: string, signal?: AbortSignal) => Promise<SearchPage<PostcodeSearchResult>>;
+  searchLocalities: (query: string, signal?: AbortSignal) => Promise<SearchPage<LocalitySearchResult>>;
+  searchStates: (query: string, signal?: AbortSignal) => Promise<SearchPage<StateSearchResult>>;
+  fetchNextPage: <T = AddressSearchResult>(nextLink: Link, signal?: AbortSignal) => Promise<SearchPage<T>>;
+  getAddressDetail: (pid: string, signal?: AbortSignal, searchPage?: SearchPage<AddressSearchResult>, resultIndex?: number) => Promise<AddressDetail>;
   /** Pre-fetch the API root so the first search doesn't pay the discovery latency. Errors are swallowed. */
   prefetch: () => Promise<void>;
 }
@@ -75,7 +87,7 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     return rootPromise;
   }
 
-  function toSearchPage(response: Awaited<ReturnType<typeof fetchLink>>, results: AddressSearchResult[]): SearchPage {
+  function toSearchPage<T>(response: Awaited<ReturnType<typeof fetchLink>>, results: T[]): SearchPage<T> {
     const nextLinks = response.links('next');
     const allLinks = response.links();
     return {
@@ -85,41 +97,58 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     };
   }
 
-  async function searchAddresses(
+  async function searchByRel<T>(
+    rel: string,
     query: string,
     signal?: AbortSignal,
-  ): Promise<SearchPage> {
+  ): Promise<SearchPage<T>> {
     const root = await getRoot();
-    const searchLinks = root.links(SEARCH_REL, { q: query.trim() });
+    const searchLinks = root.links(rel, { q: query.trim() });
     if (!searchLinks.length) {
-      throw new Error('Search link relation not found in API root');
+      throw new Error(`Search link relation not found in API root: ${rel}`);
     }
     const doFetch = () => fetchLink(searchLinks[0], { signal });
     const response = retryOpts ? await withRetry(doFetch, { ...retryOpts, signal }) : await doFetch();
     if (!response.ok) {
       throw new Error(`Search error: ${response.status} ${response.statusText}`);
     }
-    const results = await response.json() as AddressSearchResult[];
+    const results = (await response.json()) as T[];
     return toSearchPage(response, results);
   }
 
-  async function fetchNextPage(
+  function searchAddresses(query: string, signal?: AbortSignal) {
+    return searchByRel<AddressSearchResult>(SEARCH_REL, query, signal);
+  }
+
+  function searchPostcodes(query: string, signal?: AbortSignal) {
+    return searchByRel<PostcodeSearchResult>(POSTCODE_SEARCH_REL, query, signal);
+  }
+
+  function searchLocalities(query: string, signal?: AbortSignal) {
+    return searchByRel<LocalitySearchResult>(LOCALITY_SEARCH_REL, query, signal);
+  }
+
+  function searchStates(query: string, signal?: AbortSignal) {
+    return searchByRel<StateSearchResult>(STATE_SEARCH_REL, query, signal);
+  }
+
+  async function fetchNextPage<T = AddressSearchResult>(
     nextLink: Link,
     signal?: AbortSignal,
-  ): Promise<SearchPage> {
+  ): Promise<SearchPage<T>> {
     const doFetch = () => fetchLink(nextLink, { signal });
     const response = retryOpts ? await withRetry(doFetch, { ...retryOpts, signal }) : await doFetch();
     if (!response.ok) {
       throw new Error(`Search error: ${response.status} ${response.statusText}`);
     }
-    const results = await response.json() as AddressSearchResult[];
+    const results = (await response.json()) as T[];
     return toSearchPage(response, results);
   }
 
   async function getAddressDetail(
     pid: string,
     signal?: AbortSignal,
-    searchPage?: SearchPage,
+    searchPage?: SearchPage<AddressSearchResult>,
     resultIndex?: number,
   ): Promise<AddressDetail> {
     // Prefer HATEOAS: follow canonical link from search results
@@ -161,5 +190,13 @@ export function createAddressrClient(options: AddressrClientOptions): AddressrCl
     }
   }
 
-  return { searchAddresses, fetchNextPage, getAddressDetail, prefetch };
+  return {
+    searchAddresses,
+    searchPostcodes,
+    searchLocalities,
+    searchStates,
+    fetchNextPage,
+    getAddressDetail,
+    prefetch,
+  };
 }

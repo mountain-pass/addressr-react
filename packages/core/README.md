@@ -59,17 +59,47 @@ Returns an `AddressrClient` with:
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `searchAddresses(query, signal?)` | `Promise<SearchPage>` | Search addresses. Returns results + HATEOAS next link. |
-| `fetchNextPage(nextLink, signal?)` | `Promise<SearchPage>` | Follow a next-page link relation. |
+| `searchAddresses(query, signal?)` | `Promise<SearchPage<AddressSearchResult>>` | Search addresses. Returns results + HATEOAS next link. |
+| `searchPostcodes(query, signal?)` | `Promise<SearchPage<PostcodeSearchResult>>` | Search postcodes. |
+| `searchLocalities(query, signal?)` | `Promise<SearchPage<LocalitySearchResult>>` | Search suburbs/towns. |
+| `searchStates(query, signal?)` | `Promise<SearchPage<StateSearchResult>>` | Search states/territories. |
+| `fetchNextPage(nextLink, signal?)` | `Promise<SearchPage<T>>` | Follow a next-page link relation. |
 | `getAddressDetail(pid, signal?, searchPage?, index?)` | `Promise<AddressDetail>` | Get full address detail. Follows canonical link when search context provided. |
 
-### `SearchPage`
+### `SearchPage<T>`
+
+Generic over the result type. Defaults to `AddressSearchResult` for backward compatibility.
 
 ```ts
 {
-  results: AddressSearchResult[];  // Array of search results
-  nextLink: Link | null;           // HATEOAS link to next page, or null
+  results: T[];           // Array of search results
+  nextLink: Link | null;  // HATEOAS link to next page, or null
 }
+```
+
+## Postcode, locality, and state search
+
+In addition to `searchAddresses`, the client exposes three narrower search methods for when a form needs only a postcode, suburb, or state. Each shares the same HATEOAS root discovery, retry behaviour, and abort semantics as `searchAddresses`.
+
+### Postcodes
+
+```ts
+const page = await client.searchPostcodes('2000');
+// page.results[0] is { postcode: '2000', localities: [{ name: 'SYDNEY' }, ...] }
+```
+
+### Localities
+
+```ts
+const page = await client.searchLocalities('sydney');
+// page.results[0] is { name: 'SYDNEY', state: { abbreviation: 'NSW', name: 'NEW SOUTH WALES' }, postcode: '2000', score, pid }
+```
+
+### States
+
+```ts
+const page = await client.searchStates('NSW');
+// page.results[0] is { name: 'NEW SOUTH WALES', abbreviation: 'NSW' }
 ```
 
 ### `RetryOptions`

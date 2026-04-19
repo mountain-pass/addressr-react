@@ -27,6 +27,8 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:browser": "playwright test",
     "lint": "eslint src/"
   },
   "dependencies": {
@@ -34,6 +36,8 @@
     "@windyroad/link-header": "^1.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "playwright": "^1.59.1",
     "vite": "^6.3.5",
     "vite-plugin-dts": "^4.5.4",
     "vitest": "^3.2.3"

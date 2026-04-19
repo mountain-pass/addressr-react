@@ -8,4 +8,7 @@ export type {
   StructuredAddress,
   AddressGeocoding,
   HighlightSegment,
+  PostcodeSearchResult,
+  LocalitySearchResult,
+  StateSearchResult,
 } from './types';
