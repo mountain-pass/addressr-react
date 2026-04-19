@@ -6,3 +6,10 @@ coverage/
 .DS_Store
 .risk-reports/
 .turbo/
+
+# Playwright test output
+test-results/
+playwright-report/
+
+# Local Claude Code state
+.claude/scheduled_tasks.lock
