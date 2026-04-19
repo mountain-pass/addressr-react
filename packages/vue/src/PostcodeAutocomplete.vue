@@ -1,16 +1,15 @@
 <!--
+  @jtbd JTBD-002 (developer-integration) + JTBD-101 (end-user)
   Slots: item, loading, no-results, error
   When using custom slots, you are responsible for accessibility:
   - loading / no-results: return <li> elements
-  - item: rendered inside the existing <li>; you also own highlight contrast (WCAG AA 4.5:1) if you restyle highlights
   - error: include role="alert" on the container
   - Maintain WCAG AA contrast (4.5:1) for any custom text
 -->
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue';
-import { parseHighlight } from '@mountainpass/addressr-core';
-import type { AddressDetail } from '@mountainpass/addressr-core';
-import { useAddressSearch } from './useAddressSearch';
+import { ref, computed } from 'vue';
+import type { PostcodeSearchResult } from '@mountainpass/addressr-core';
+import { usePostcodeSearch } from './usePostcodeSearch';
 
 const props = withDefaults(defineProps<{
   apiKey?: string;
@@ -23,14 +22,14 @@ const props = withDefaults(defineProps<{
   debounceMs?: number;
   fetchImpl?: typeof fetch;
 }>(), {
-  label: 'Search Australian addresses',
-  placeholder: 'Start typing an address...',
-  name: 'address',
+  label: 'Search Australian postcodes',
+  placeholder: 'Start typing a postcode...',
+  name: 'postcode',
   required: false,
 });
 
 const emit = defineEmits<{
-  select: [address: AddressDetail];
+  select: [result: PostcodeSearchResult];
 }>();
 
 const uid = `addressr-${Math.random().toString(36).slice(2, 9)}`;
@@ -39,7 +38,7 @@ const listboxId = `${uid}-listbox`;
 const statusId = `${uid}-status`;
 const errorId = `${uid}-error`;
 
-const search = useAddressSearch({
+const search = usePostcodeSearch({
   apiKey: props.apiKey,
   apiUrl: props.apiUrl,
   apiHost: props.apiHost,
@@ -49,12 +48,6 @@ const search = useAddressSearch({
 
 const isOpen = ref(false);
 const highlightedIndex = ref(-1);
-
-watch(search.selectedAddress, (addr) => {
-  if (addr) {
-    emit('select', addr);
-  }
-});
 
 function handleInput(event: Event) {
   const value = (event.target as HTMLInputElement).value;
@@ -89,8 +82,8 @@ function handleKeydown(event: KeyboardEvent) {
 function selectItem(index: number) {
   const item = search.results.value[index];
   if (item) {
-    search.selectAddress(item.pid);
-    search.setQuery(item.sla);
+    emit('select', item);
+    search.setQuery(item.postcode);
     isOpen.value = false;
     highlightedIndex.value = -1;
   }
@@ -148,9 +141,9 @@ const activeDescendant = computed(() =>
     />
 
     <div :id="statusId" role="status" aria-live="polite" aria-atomic="true" class="addressr-sr-only">
-      <template v-if="search.isLoading.value">Searching addresses...</template>
-      <template v-else-if="search.results.value.length > 0">{{ search.results.value.length }} addresses found</template>
-      <template v-else-if="search.query.value.length >= 3">No addresses found</template>
+      <template v-if="search.isLoading.value">Searching postcodes...</template>
+      <template v-else-if="search.results.value.length > 0">{{ search.results.value.length }} postcodes found</template>
+      <template v-else-if="search.query.value.length >= 3">No postcodes found</template>
     </div>
 
     <ul
@@ -163,19 +156,19 @@ const activeDescendant = computed(() =>
       <template v-if="showMenu">
         <template v-if="search.isLoading.value">
           <slot name="loading">
-            <li class="addressr-skeleton" style="width: 80%" aria-hidden="true"></li>
+            <li class="addressr-skeleton" style="width: 40%" aria-hidden="true"></li>
             <li class="addressr-skeleton" style="width: 60%" aria-hidden="true"></li>
-            <li class="addressr-skeleton" style="width: 70%" aria-hidden="true"></li>
+            <li class="addressr-skeleton" style="width: 50%" aria-hidden="true"></li>
           </slot>
         </template>
         <template v-if="!search.isLoading.value && search.results.value.length === 0 && search.query.value.length >= 3">
           <slot name="no-results">
-            <li class="addressr-no-results">No addresses found</li>
+            <li class="addressr-no-results">No postcodes found</li>
           </slot>
         </template>
         <li
           v-for="(item, index) in search.results.value"
-          :key="item.pid"
+          :key="item.postcode"
           :id="`${uid}-option-${index}`"
           role="option"
           tabindex="-1"
@@ -185,11 +178,11 @@ const activeDescendant = computed(() =>
           @click="selectItem(index)"
           @mouseenter="highlightedIndex = index"
         >
-          <slot name="item" :item="item" :highlighted="highlightedIndex === index" :segments="parseHighlight(item.highlight?.sla ?? item.sla)">
+          <slot name="item" :item="item" :highlighted="highlightedIndex === index">
             <span>
-              <template v-for="(seg, i) in parseHighlight(item.highlight?.sla ?? item.sla)" :key="i">
-                <mark v-if="seg.highlighted">{{ seg.text }}</mark>
-                <span v-else>{{ seg.text }}</span>
+              <strong>{{ item.postcode }}</strong>
+              <template v-if="item.localities.length > 0">
+                {{ ' — ' }}{{ item.localities.map((l) => l.name).join(', ') }}
               </template>
             </span>
           </slot>
@@ -250,9 +243,7 @@ const activeDescendant = computed(() =>
   box-shadow: var(--addressr-shadow, 0 4px 6px rgba(0, 0, 0, 0.1));
   box-sizing: border-box;
 }
-.addressr-menu-hidden {
-  display: none;
-}
+.addressr-menu-hidden { display: none; }
 .addressr-item {
   min-height: 2.75rem;
   padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
@@ -264,11 +255,6 @@ const activeDescendant = computed(() =>
 }
 .addressr-item-highlighted {
   background-color: var(--addressr-highlight-bg, #e8f0fe);
-}
-.addressr-item :deep(mark) {
-  background-color: transparent;
-  font-weight: var(--addressr-mark-weight, 700);
-  color: var(--addressr-mark-color, inherit);
 }
 .addressr-no-results {
   padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);
@@ -304,9 +290,7 @@ const activeDescendant = computed(() =>
   100% { background-position: -200% 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .addressr-skeleton {
-    animation: none;
-  }
+  .addressr-skeleton { animation: none; }
 }
 .addressr-sr-only {
   position: absolute;

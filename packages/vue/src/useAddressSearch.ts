@@ -1,11 +1,6 @@
-import { ref, watch, onUnmounted, type Ref } from 'vue';
-import type { Link } from '@windyroad/link-header';
-import {
-  createAddressrClient,
-  type AddressSearchResult,
-  type AddressDetail,
-  type SearchPage,
-} from '@mountainpass/addressr-core';
+import { ref, type Ref } from 'vue';
+import type { AddressSearchResult, AddressDetail } from '@mountainpass/addressr-core';
+import { useSearch } from './useSearch';
 
 export interface UseAddressSearchOptions {
   /** RapidAPI key. Omit when connecting directly to an addressr instance. */
@@ -33,146 +28,40 @@ export interface UseAddressSearchReturn {
 }
 
 export function useAddressSearch(options: UseAddressSearchOptions): UseAddressSearchReturn {
-  const {
-    apiKey,
-    apiUrl,
-    apiHost,
-    debounceMs = 300,
-    minQueryLength = 3,
-    fetchImpl,
-  } = options;
-
-  const client = createAddressrClient({ apiKey, apiUrl, apiHost, fetchImpl });
-
-  // Prefetch API root so the first search doesn't pay discovery latency
-  client.prefetch();
-
-  const query = ref('');
-  const debouncedQuery = ref('');
-  const results = ref<AddressSearchResult[]>([]);
-  const isLoading = ref(false);
-  const isLoadingMore = ref(false);
-  const hasMore = ref(false);
-  const error = ref<Error | null>(null);
-  const selectedAddress = ref<AddressDetail | null>(null);
-
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let abortController: AbortController | undefined;
-  let nextLink: Link | null = null;
-  let searchPage: SearchPage | null = null;
-
-  function setQuery(q: string) {
-    query.value = q;
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      debouncedQuery.value = q;
-    }, debounceMs);
-  }
-
-  watch(debouncedQuery, (q) => {
-    if (q.length < minQueryLength) {
-      results.value = [];
-      hasMore.value = false;
-      nextLink = null;
-      searchPage = null;
-      return;
-    }
-
-    abortController?.abort();
-    const controller = new AbortController();
-    abortController = controller;
-
-    isLoading.value = true;
-    error.value = null;
-
-    client
-      .searchAddresses(q, controller.signal)
-      .then((page) => {
-        if (!controller.signal.aborted) {
-          results.value = page.results;
-          nextLink = page.nextLink;
-          searchPage = page;
-          hasMore.value = page.nextLink !== null;
-          isLoading.value = false;
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted && err.name !== 'AbortError') {
-          error.value = err;
-          isLoading.value = false;
-          results.value = [];
-          hasMore.value = false;
-          nextLink = null;
-          searchPage = null;
-        }
-      });
+  const inner = useSearch<AddressSearchResult>({
+    ...options,
+    searchFn: (client, q, signal) => client.searchAddresses(q, signal),
   });
 
-  async function loadMore() {
-    if (!nextLink || isLoadingMore.value) return;
-
-    isLoadingMore.value = true;
-    try {
-      const page = await client.fetchNextPage(nextLink);
-      results.value = [...results.value, ...page.results];
-      nextLink = page.nextLink;
-      searchPage = page;
-      hasMore.value = page.nextLink !== null;
-    } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        error.value = err;
-      }
-    } finally {
-      isLoadingMore.value = false;
-    }
-  }
+  const selectedAddress = ref<AddressDetail | null>(null);
 
   async function selectAddress(pid: string) {
-    const index = results.value.findIndex((r) => r.pid === pid);
-    const detail = await client.getAddressDetail(
+    const lastPage = inner.getLastPage();
+    const index = inner.results.value.findIndex((r) => r.pid === pid);
+    const detail = await inner.client.getAddressDetail(
       pid,
       undefined,
-      index !== -1 ? searchPage ?? undefined : undefined,
+      index !== -1 ? lastPage ?? undefined : undefined,
       index !== -1 ? index : undefined,
     );
     selectedAddress.value = detail;
   }
 
   function clear() {
-    clearTimeout(debounceTimer);
-    abortController?.abort();
-    query.value = '';
-    debouncedQuery.value = '';
-    results.value = [];
-    isLoading.value = false;
-    isLoadingMore.value = false;
-    hasMore.value = false;
-    error.value = null;
+    inner.clear();
     selectedAddress.value = null;
-    nextLink = null;
-    searchPage = null;
-  }
-
-  // Cleanup on unmount when used in component context
-  try {
-    onUnmounted(() => {
-      clearTimeout(debounceTimer);
-      abortController?.abort();
-    });
-  } catch {
-    // Not in component context — no cleanup needed
   }
 
   return {
-    query,
-    results,
-    isLoading,
-    isLoadingMore,
-    hasMore,
-    error,
+    query: inner.query,
+    results: inner.results,
+    isLoading: inner.isLoading,
+    isLoadingMore: inner.isLoadingMore,
+    hasMore: inner.hasMore,
+    error: inner.error,
     selectedAddress,
-    setQuery,
-    loadMore,
+    setQuery: inner.setQuery,
+    loadMore: inner.loadMore,
     selectAddress,
     clear,
   };

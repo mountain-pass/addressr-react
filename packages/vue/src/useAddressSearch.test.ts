@@ -293,4 +293,16 @@ describe('useAddressSearch', () => {
       expect(search.results.value).toHaveLength(1);
     });
   });
+
+  it('delegates to the internal useSearch composable (regression gate for ADR 006 refactor)', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(makeMockSearchResponse());
+    const search = useAddressSearch({ apiKey: 'k', fetchImpl: mockFetch, debounceMs: 10, minQueryLength: 3 });
+    search.setQuery('1 george');
+    await vi.waitFor(() => {
+      expect(search.results.value).toHaveLength(1);
+    });
+    expect(search.results.value[0].pid).toBe('GANSW123');
+  });
 });
