@@ -1,11 +1,9 @@
 import { writable, type Readable } from 'svelte/store';
-import type { Link } from '@windyroad/link-header';
-import {
-  createAddressrClient,
-  type AddressSearchResult,
-  type AddressDetail,
-  type SearchPage,
+import type {
+  AddressSearchResult,
+  AddressDetail,
 } from '@mountainpass/addressr-core';
+import { createSearch } from './createSearch';
 
 export interface AddressSearchOptions {
   /** RapidAPI key. Omit when connecting directly to an addressr instance. */
@@ -37,27 +35,15 @@ export interface AddressSearchStore extends Readable<AddressSearchState> {
 }
 
 export function createAddressSearch(options: AddressSearchOptions): AddressSearchStore {
-  const {
-    apiKey,
-    apiUrl,
-    apiHost,
-    debounceMs = 300,
-    minQueryLength = 3,
-    fetchImpl,
-  } = options;
+  const inner = createSearch<AddressSearchResult>({
+    ...options,
+    searchFn: (client, q, signal) => client.searchAddresses(q, signal),
+  });
 
-  const client = createAddressrClient({ apiKey, apiUrl, apiHost, fetchImpl });
+  let currentResults: AddressSearchResult[] = [];
+  let currentDetail: AddressDetail | null = null;
 
-  // Prefetch API root so the first search doesn't pay discovery latency
-  client.prefetch();
-
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let abortController: AbortController | undefined;
-  let nextLink: Link | null = null;
-  let searchPage: SearchPage | null = null;
-  // No debouncedQuery tracking needed — the timer handles debounce directly
-
-  const { subscribe, set, update } = writable<AddressSearchState>({
+  const merged = writable<AddressSearchState>({
     query: '',
     results: [],
     isLoading: false,
@@ -67,127 +53,39 @@ export function createAddressSearch(options: AddressSearchOptions): AddressSearc
     selectedAddress: null,
   });
 
-  function doSearch(query: string) {
-    if (query.length < minQueryLength) {
-      update((s) => ({ ...s, results: [], isLoading: false, hasMore: false }));
-      nextLink = null;
-      searchPage = null;
-      return;
-    }
-
-    abortController?.abort();
-    const controller = new AbortController();
-    abortController = controller;
-
-    update((s) => ({ ...s, isLoading: true, error: null }));
-
-    client
-      .searchAddresses(query, controller.signal)
-      .then((page) => {
-        if (!controller.signal.aborted) {
-          nextLink = page.nextLink;
-          searchPage = page;
-          update((s) => ({
-            ...s,
-            results: page.results,
-            isLoading: false,
-            hasMore: page.nextLink !== null,
-          }));
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted && err.name !== 'AbortError') {
-          nextLink = null;
-          searchPage = null;
-          update((s) => ({
-            ...s,
-            error: err,
-            isLoading: false,
-            results: [],
-            hasMore: false,
-          }));
-        }
-      });
-  }
-
-  function setQuery(q: string) {
-    update((s) => ({ ...s, query: q }));
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      doSearch(q);
-    }, debounceMs);
-  }
-
-  async function loadMore() {
-    if (!nextLink) return;
-
-    let currentlyLoading = false;
-    update((s) => {
-      currentlyLoading = s.isLoadingMore;
-      return s;
-    });
-    if (currentlyLoading) return;
-
-    update((s) => ({ ...s, isLoadingMore: true }));
-    try {
-      const page = await client.fetchNextPage(nextLink);
-      nextLink = page.nextLink;
-      searchPage = page;
-      update((s) => ({
-        ...s,
-        results: [...s.results, ...page.results],
-        isLoadingMore: false,
-        hasMore: page.nextLink !== null,
-      }));
-    } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        update((s) => ({ ...s, error: err as Error, isLoadingMore: false }));
-      }
-    }
-  }
+  const unsubInner = inner.subscribe((s) => {
+    currentResults = s.results;
+    merged.set({ ...s, selectedAddress: currentDetail });
+  });
 
   async function selectAddress(pid: string) {
-    let currentResults: AddressSearchResult[] = [];
-    update((s) => {
-      currentResults = s.results;
-      return s;
-    });
-
+    const lastPage = inner.getLastPage();
     const index = currentResults.findIndex((r) => r.pid === pid);
-    const detail = await client.getAddressDetail(
+    const detail = await inner.client.getAddressDetail(
       pid,
       undefined,
-      index !== -1 ? searchPage ?? undefined : undefined,
+      index !== -1 ? lastPage ?? undefined : undefined,
       index !== -1 ? index : undefined,
     );
-    update((s) => ({ ...s, selectedAddress: detail }));
+    currentDetail = detail;
+    merged.update((m) => ({ ...m, selectedAddress: detail }));
   }
 
   function clear() {
-    clearTimeout(debounceTimer);
-    abortController?.abort();
-    nextLink = null;
-    searchPage = null;
-    set({
-      query: '',
-      results: [],
-      isLoading: false,
-      isLoadingMore: false,
-      hasMore: false,
-      error: null,
-      selectedAddress: null,
-    });
+    inner.clear();
+    currentDetail = null;
+    merged.update((m) => ({ ...m, selectedAddress: null }));
   }
 
   function destroy() {
-    clearTimeout(debounceTimer);
-    abortController?.abort();
+    inner.destroy();
+    unsubInner();
   }
 
   return {
-    subscribe,
-    setQuery,
-    loadMore,
+    subscribe: merged.subscribe,
+    setQuery: inner.setQuery,
+    loadMore: inner.loadMore,
     selectAddress,
     clear,
     destroy,

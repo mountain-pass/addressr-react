@@ -294,4 +294,16 @@ describe('createAddressSearch', () => {
       return expect(state.results).toHaveLength(1) && state.results[0].pid === 'GANSW123';
     });
   });
+
+  it('delegates to the internal createSearch generic (regression gate for ADR 006 refactor)', async () => {
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(MOCK_ROOT_RESPONSE)
+      .mockResolvedValueOnce(makeMockSearchResponse());
+    const store = createTestStore(mockFetch);
+    store.setQuery('1 george');
+    await vi.waitFor(() => {
+      expect(get(store).results).toHaveLength(1);
+    });
+    expect(get(store).results[0].pid).toBe('GANSW123');
+  });
 });

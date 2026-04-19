@@ -1,27 +1,26 @@
 <!--
+  @jtbd JTBD-002 (developer-integration) + JTBD-101 (end-user)
   Slots: item, loading, no-results, error
   When using custom slots, you are responsible for accessibility:
   - loading / no-results: return <li> elements
-  - item: rendered inside the existing <li>; you also own highlight contrast (WCAG AA 4.5:1) if you restyle highlights
+  - item: rendered inside the existing <li>
   - error: include role="alert" on the container
   - Maintain WCAG AA contrast (4.5:1) for any custom text
 -->
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { get } from 'svelte/store';
-  import { parseHighlight } from '@mountainpass/addressr-core';
-  import type { AddressDetail } from '@mountainpass/addressr-core';
-  import { createAddressSearch } from './createAddressSearch';
+  import type { PostcodeSearchResult } from '@mountainpass/addressr-core';
+  import { createPostcodeSearch } from './createPostcodeSearch';
 
   export let apiKey: string | undefined = undefined;
   export let apiUrl: string | undefined = undefined;
   export let apiHost: string | undefined = undefined;
-  export let label: string = 'Search Australian addresses';
-  export let placeholder: string = 'Start typing an address...';
+  export let label: string = 'Search Australian postcodes';
+  export let placeholder: string = 'Start typing a postcode...';
   export let debounceMs: number | undefined = undefined;
-  export let name: string = 'address';
+  export let name: string = 'postcode';
   export let required: boolean = false;
-  export let onSelect: ((address: AddressDetail) => void) | undefined = undefined;
+  export let onSelect: ((result: PostcodeSearchResult) => void) | undefined = undefined;
   export let fetchImpl: typeof fetch | undefined = undefined;
 
   const uid = `addressr-${Math.random().toString(36).slice(2, 9)}`;
@@ -30,18 +29,17 @@
   const statusId = `${uid}-status`;
   const errorId = `${uid}-error`;
 
-  const store = createAddressSearch({ apiKey, apiUrl, apiHost, debounceMs, fetchImpl });
+  const store = createPostcodeSearch({ apiKey, apiUrl, apiHost, debounceMs, fetchImpl });
 
   let isOpen = false;
   let highlightedIndex = -1;
 
   let query = '';
-  let results: any[] = [];
+  let results: PostcodeSearchResult[] = [];
   let isLoading = false;
   let isLoadingMore = false;
   let hasMore = false;
   let error: Error | null = null;
-  let selectedAddress: AddressDetail | null = null;
 
   store.subscribe((s) => {
     query = s.query;
@@ -50,10 +48,6 @@
     isLoadingMore = s.isLoadingMore;
     hasMore = s.hasMore;
     error = s.error;
-    selectedAddress = s.selectedAddress;
-    if (selectedAddress && onSelect) {
-      onSelect(selectedAddress);
-    }
   });
 
   function handleInput(event: Event) {
@@ -71,9 +65,7 @@
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       highlightedIndex = Math.min(highlightedIndex + 1, results.length - 1);
-      if (highlightedIndex === results.length - 1 && hasMore) {
-        store.loadMore();
-      }
+      if (highlightedIndex === results.length - 1 && hasMore) store.loadMore();
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       highlightedIndex = Math.max(highlightedIndex - 1, -1);
@@ -89,8 +81,8 @@
   function selectItem(index: number) {
     const item = results[index];
     if (item) {
-      store.selectAddress(item.pid);
-      store.setQuery(item.sla);
+      if (onSelect) onSelect(item);
+      store.setQuery(item.postcode);
       isOpen = false;
       highlightedIndex = -1;
     }
@@ -141,11 +133,11 @@
 
   <div id={statusId} role="status" aria-live="polite" aria-atomic="true" class="addressr-sr-only">
     {#if isLoading}
-      Searching addresses...
+      Searching postcodes...
     {:else if results.length > 0}
-      {results.length} addresses found
+      {results.length} postcodes found
     {:else if query.length >= 3}
-      No addresses found
+      No postcodes found
     {/if}
   </div>
 
@@ -159,17 +151,17 @@
     {#if showMenu}
       {#if isLoading}
         <slot name="loading">
-          <li class="addressr-skeleton" style="width: 80%" aria-hidden="true"></li>
+          <li class="addressr-skeleton" style="width: 40%" aria-hidden="true"></li>
           <li class="addressr-skeleton" style="width: 60%" aria-hidden="true"></li>
-          <li class="addressr-skeleton" style="width: 70%" aria-hidden="true"></li>
+          <li class="addressr-skeleton" style="width: 50%" aria-hidden="true"></li>
         </slot>
       {/if}
       {#if !isLoading && results.length === 0 && query.length >= 3}
         <slot name="no-results">
-          <li class="addressr-no-results">No addresses found</li>
+          <li class="addressr-no-results">No postcodes found</li>
         </slot>
       {/if}
-      {#each results as item, index}
+      {#each results as item, index (item.postcode)}
         <li
           id="{uid}-option-{index}"
           role="option"
@@ -180,15 +172,12 @@
           on:click={() => selectItem(index)}
           on:mouseenter={() => { highlightedIndex = index; }}
         >
-          <slot name="item" {item} highlighted={highlightedIndex === index} segments={parseHighlight(item.highlight?.sla ?? item.sla)}>
+          <slot name="item" {item} highlighted={highlightedIndex === index}>
             <span>
-              {#each parseHighlight(item.highlight?.sla ?? item.sla) as seg}
-                {#if seg.highlighted}
-                  <mark>{seg.text}</mark>
-                {:else}
-                  <span>{seg.text}</span>
-                {/if}
-              {/each}
+              <strong>{item.postcode}</strong>
+              {#if item.localities.length > 0}
+                {' — '}{item.localities.map((l) => l.name).join(', ')}
+              {/if}
             </span>
           </slot>
         </li>
@@ -264,11 +253,6 @@
   }
   .addressr-item-highlighted {
     background-color: var(--addressr-highlight-bg, #e8f0fe);
-  }
-  .addressr-item :global(mark) {
-    background-color: transparent;
-    font-weight: var(--addressr-mark-weight, 700);
-    color: var(--addressr-mark-color, inherit);
   }
   .addressr-no-results {
     padding: var(--addressr-padding-y, 0.625rem) var(--addressr-padding-x, 0.75rem);

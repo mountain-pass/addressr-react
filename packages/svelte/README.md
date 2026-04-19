@@ -162,6 +162,26 @@ Implements the WAI-ARIA combobox pattern:
 - Accessible label always present
 - Infinite scroll with loading indicator
 
+## Postcode, Locality, and State search
+
+For narrower lookups (postcode-only picker on a shipping form, suburb autocomplete, state dropdown) the package also exports three drop-in components and matching headless stores. Each mirrors `AddressAutocomplete`'s a11y, keyboard, and slot contract; the only difference is `onSelect` receives the `SearchResult` directly (no follow-up detail fetch — see ADR 006).
+
+```svelte
+<script>
+  import {
+    PostcodeAutocomplete,
+    LocalityAutocomplete,
+    StateAutocomplete,
+  } from '@mountainpass/addressr-svelte';
+</script>
+
+<PostcodeAutocomplete apiKey="..." onSelect={(r) => console.log(r.postcode, r.localities)} />
+<LocalityAutocomplete apiKey="..." onSelect={(r) => console.log(r.name, r.state.abbreviation, r.postcode)} />
+<StateAutocomplete    apiKey="..." onSelect={(r) => console.log(r.name, r.abbreviation)} />
+```
+
+Headless equivalents `createPostcodeSearch`, `createLocalitySearch`, `createStateSearch` are also exported and follow the same shape as `createAddressSearch`.
+
 ## Re-exports
 
 This package re-exports everything from [`@mountainpass/addressr-core`](../core) for convenience -- `createAddressrClient`, `parseHighlight`, and all types.
