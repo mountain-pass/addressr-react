@@ -13,6 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify required secrets
+        env:
+          ADDRESSR_RAPIDAPI_KEY: ${{ secrets.ADDRESSR_RAPIDAPI_KEY }}
+        run: |
+          if [ -z "$ADDRESSR_RAPIDAPI_KEY" ]; then
+            echo "::error::Repo secret ADDRESSR_RAPIDAPI_KEY is not set. Run: printf %s \"\$ADDRESSR_RAPIDAPI_KEY\" | gh secret set ADDRESSR_RAPIDAPI_KEY"
+            exit 1
+          fi
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -41,6 +49,14 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+      - name: Verify required secrets
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::Repo secret NPM_TOKEN is not set"
+            exit 1
+          fi
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
