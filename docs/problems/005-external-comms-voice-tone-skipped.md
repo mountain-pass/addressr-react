@@ -1,8 +1,10 @@
 ---
 id: PROB-005
-status: open
+status: parked
 severity: medium
 created: 2026-04-18
+parked: 2026-04-26
+upstream: windyroad/agent-plugins
 ---
 
 # External-comms drafts skip voice-tone review
@@ -30,3 +32,9 @@ Reputation risk with external maintainers. Burns user time correcting tone post-
 4. **Inline lint script**: `scripts/voice-tone-lint.sh` that flags em dashes, hedging phrases, and "AI tells" from `docs/VOICE-AND-TONE.md`. Runs before any `gh comment` / `gh create` bash call.
 
 Preferred: (1) + (2). The CLAUDE.md rule trains behaviour; the hook catches slips.
+
+## Parked
+
+- **Reason**: Fix scope is upstream in the Windy Road plugin suite (`windyroad/agent-plugins`), not in this `addressr-react` repo. The CLAUDE.md rule and the PreToolUse hook should ship as part of the relevant plugin (likely `wr-voice-tone`) so every project that adopts that plugin inherits the enforcement, rather than each project carrying duplicate copies.
+- **Un-park trigger**: `windyroad/agent-plugins` ships a global voice-tone enforcement rule + hook covering external-audience drafts (e.g. `gh issue comment`, `gh pr comment`, `gh issue create`, plus any non-tool conversation output flagged as external-audience). Re-open this ticket only if the upstream fix proves insufficient for `addressr-react` specifically.
+- **Date parked**: 2026-04-26 (during 2026-04-25 retrospective; user explicitly routed the fix upstream).
